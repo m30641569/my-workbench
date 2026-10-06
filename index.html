@@ -139,6 +139,23 @@
   .mem-edit-btns button[type=submit]{background:var(--brand);color:#fff}
   .mem-edit-btns button.ghost{border:1px solid var(--line);color:var(--muted);background:var(--bg)}
 
+  /* 75团队：教练团＋学员档案两列 */
+  .coach-list{display:flex;flex-wrap:wrap;align-items:center;gap:6px 4px;min-height:24px}
+  .coach-list .empty{padding:0}
+  .coach-name{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-size:14px;color:var(--brand);background:var(--soft);border-radius:999px;padding:4px 6px 4px 11px}
+  .coach-name .del{font-size:15px;line-height:1;padding:0 3px;color:var(--brand);opacity:.55}
+  .coach-sep{color:var(--muted)}
+  .member-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .member-grid .empty{grid-column:1/-1}
+  .mem-card{display:flex;align-items:flex-start;gap:6px;border:1px solid var(--line);border-radius:12px;padding:10px 11px;background:var(--bg);cursor:pointer}
+  .mem-card:active{background:var(--soft)}
+  .mem-card .mem-main{flex:1;min-width:0;word-break:break-word}
+  .mem-card .mem-name{font-weight:700}
+  .mem-card .mem-buddy{font-size:12px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
+  .mem-card .del{opacity:.45}
+  .member-grid .mem-card.editing{grid-column:1/-1;display:block;cursor:default;background:var(--card)}
+  .member-grid .mem-card.editing:active{background:var(--card)}
+
   /* timeline */
   .timeline{position:relative;padding-left:18px}
  .timeline::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--line)}
@@ -524,6 +541,25 @@
 
   <section id="view-org-team75" class="view" hidden>
     <button type="button" class="back-btn" data-goto="org">← 返回组织</button>
+    <div class="card">
+      <div class="card-h"><h2>教练团</h2><span class="hint">点名字后的 × 删除</span></div>
+      <div id="list-team75Coaches" class="coach-list"></div>
+      <form id="form-team75Coaches" class="add-form" autocomplete="off">
+        <input name="name" class="full" placeholder="教练姓名…" required>
+        <button type="submit">加</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>学员档案</h2><span class="hint">点格子编辑</span></div>
+      <ul id="list-orgTeam75Members" class="rec-list member-grid"></ul>
+      <form id="form-orgTeam75Members" class="add-form" autocomplete="off">
+        <input name="name" placeholder="姓名" required>
+        <input name="role" placeholder="角色">
+        <input type="date" name="birthday" aria-label="生日">
+        <input name="buddy" class="full" placeholder="死党（多个用、分隔）">
+        <button type="submit">加</button>
+      </form>
+    </div>
     <div class="card" id="team75BirthdayCard">
       <div class="card-h"><h2>🎂 近期生日</h2><span class="hint">30 天内</span></div>
       <ul id="list-team75Birthdays" class="rec-list"></ul>
@@ -543,17 +579,6 @@
       <form id="form-orgTeam75Meetings" class="add-form" autocomplete="off">
         <input type="date" name="date" aria-label="日期">
         <input name="text" class="full" placeholder="组会内容…" required>
-        <button type="submit">加</button>
-      </form>
-    </div>
-    <div class="card">
-      <div class="card-h"><h2>成员档案</h2><span class="hint">姓名＋生日＋死党</span></div>
-      <ul id="list-orgTeam75Members" class="rec-list"></ul>
-      <form id="form-orgTeam75Members" class="add-form" autocomplete="off">
-        <input name="name" placeholder="姓名" required>
-        <input name="role" placeholder="角色">
-        <input type="date" name="birthday" aria-label="生日">
-        <input name="buddy" class="full" placeholder="死党（多个用、分隔）">
         <button type="submit">加</button>
       </form>
     </div>
@@ -673,7 +698,7 @@
       org:{
         dream:{ events:[], members:[], meetings:[] },
         media:{ topics:[], calendar:[], reviews:[] },
-        team75:{ events:[], meetings:[], members:[], seed:0 }
+        team75:{ events:[], meetings:[], members:[], coaches:[], seed:0 }
       }
     };
   }
@@ -725,6 +750,7 @@
         state.org.team75.events = arr(tt.events);
         state.org.team75.meetings = arr(tt.meetings);
         state.org.team75.members = arr(tt.members);
+        state.org.team75.coaches = arr(tt.coaches);
         state.org.team75.seed = +tt.seed || 0;
       }
     }catch(e){ /* 本地数据损坏则忽略，不影响打开 */ }
@@ -914,7 +940,7 @@
   }
   function team75MemberHTML(r){
     if(r.id === editingTeam75){
-      return '<li class="rec editing" data-id="'+esc(r.id)+'">'
+      return '<li class="mem-card editing" data-id="'+esc(r.id)+'">'
         + '<form class="mem-edit" data-id="'+esc(r.id)+'">'
         + '<input name="name" value="'+esc(r.name)+'" placeholder="姓名" required>'
         + '<input name="role" value="'+esc(r.role||'')+'" placeholder="角色">'
@@ -924,16 +950,26 @@
         + '<button type="button" class="ghost" data-act="cancelEdit">取消</button></div>'
         + '</form></li>';
     }
-    var sub = '';
-    if(r.role) sub += '<span class="rec-tag">'+esc(r.role)+'</span>';
-    if(r.birthday) sub += '<div class="rec-sub">生日：'+esc(fmtDay(r.birthday))+'</div>';
-    if(r.buddy) sub += '<div class="rec-sub">死党：'+esc(r.buddy)+'</div>';
-    return '<li class="rec" data-id="'+esc(r.id)+'">'
-      + '<div class="rec-main"><div class="rec-title">'+esc(r.name)+'</div>'+sub+'</div>'
-      + '<div class="rec-acts">'
-      + '<button type="button" class="edit" data-act="editMem" data-id="'+esc(r.id)+'">编辑</button>'
+    return '<li class="mem-card" data-act="editMem" data-id="'+esc(r.id)+'" role="button" tabindex="0">'
+      + '<div class="mem-main"><div class="mem-name">'+esc(r.name)+'</div>'
+      + '<div class="mem-buddy">死党：'+esc(r.buddy||'—')+'</div></div>'
       + delBtn('orgTeam75Members', r.id)
-      + '</div></li>';
+      + '</li>';
+  }
+  /* 教练团：横向人名列表，本地存储，支持增删 */
+  function renderTeam75Coaches(){
+    var wrap = $('#list-team75Coaches'); if(!wrap) return;
+    var list = state.org.team75.coaches || [];
+    if(!list.length){ wrap.innerHTML = '<span class="empty">还没有教练，在下方添加。</span>'; return; }
+    wrap.innerHTML = list.map(function(c){
+      return '<span class="coach-name">'+esc(c.name)
+        + '<button type="button" class="del" data-act="delCoach" data-id="'+esc(c.id)+'" aria-label="删除">×</button></span>';
+    }).join('<span class="coach-sep">·</span>');
+  }
+  function delCoach(id){
+    var list = state.org.team75.coaches || [];
+    for(var i=0;i<list.length;i++){ if(list[i].id===id){ list.splice(i,1); break; } }
+    save(); renderTeam75Coaches();
   }
   function renderTeam75Birthdays(){
     var ul = $('#list-team75Birthdays'); if(!ul) return;
@@ -1061,7 +1097,7 @@
       item:function(r){ return itemWrap('rec', dline(r.date)+'<div class="rec-title">'+esc(r.text)+'</div>', 'orgTeam75Meetings', r.id); }
     },
     orgTeam75Members:{
-      get:function(){ return state.org.team75.members; }, empty:'还没有成员档案。',
+      get:function(){ return state.org.team75.members; }, empty:'还没有学员档案。',
       make:function(v){ return {id:uid(), name:(v.name||'').trim(), role:(v.role||'').trim(), birthday:(v.birthday||'').trim(), buddy:(v.buddy||'').trim()}; },
       item:function(r){ return team75MemberHTML(r); }
     }
@@ -1111,6 +1147,18 @@
     var form = $('#form-'+key); if(!form) return;
     form.addEventListener('submit', function(e){ e.preventDefault(); addRecFromForm(key, form); });
   });
+  var coachForm = $('#form-team75Coaches');
+  if(coachForm){
+    coachForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var inp = coachForm.querySelector('input[name="name"]');
+      var name = ((inp && inp.value) || '').trim();
+      if(!name) return;
+      if(!state.org.team75.coaches) state.org.team75.coaches = [];
+      state.org.team75.coaches.push({ id:uid(), name:name });
+      save(); inp.value=''; renderTeam75Coaches(); toast('已添加');
+    });
+  }
   document.addEventListener('submit', function(e){
     var f = e.target.closest ? e.target.closest('form.mem-edit') : null;
     if(!f) return;
@@ -1337,7 +1385,7 @@
 
   function render(){
     renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary(); loadReports(); renderOrgHub();
-    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar(); renderTeam75Birthdays();
+    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar(); renderTeam75Coaches(); renderTeam75Birthdays();
   }
 
   /* 缪斯的总结：读取 summaries/YYYY-MM-DD.md，读不到就安静隐藏 */
@@ -1430,6 +1478,8 @@
     if(chip){ activeFilter = chip.dataset.tag; renderNotes(); return; }
     var dr = t.closest('[data-act="delRec"]');
     if(dr){ delRec(dr.dataset.key, dr.dataset.id); return; }
+    var dc = t.closest('[data-act="delCoach"]');
+    if(dc){ delCoach(dc.dataset.id); return; }
     var em = t.closest('[data-act="editMem"]');
     if(em){ editingTeam75 = em.dataset.id; render(); return; }
     var ce = t.closest('[data-act="cancelEdit"]');
@@ -1444,6 +1494,11 @@
     if(cn){ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+1, 1); calSel=null; renderCalendar(); return; }
     var cd = t.closest('[data-act="calDay"]');
     if(cd){ var dd = cd.dataset.date; if(!dd) return; calSel = (calSel===dd ? null : dd); renderCalendar(); return; }
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    var mc = e.target.closest ? e.target.closest('.mem-card[data-act="editMem"]') : null;
+    if(mc){ e.preventDefault(); editingTeam75 = mc.dataset.id; render(); }
   });
   document.addEventListener('input', function(e){
     var ta = e.target.closest ? e.target.closest('textarea[data-act="planReview"]') : null;
