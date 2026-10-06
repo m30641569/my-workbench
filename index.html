@@ -127,6 +127,17 @@
   .rec-tag{font-size:11px;font-weight:700;color:var(--brand);background:var(--soft);border-radius:6px;padding:2px 7px;margin-right:7px}
   .rec textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;outline:none;resize:none;margin-top:7px;min-height:44px}
   .rec textarea:focus{border-color:var(--brand-2)}
+  .rec-acts{flex:none;display:flex;align-items:center;gap:2px}
+  .rec-acts .edit{font-size:13px;font-weight:600;color:var(--brand-2);padding:2px 6px}
+  .rec.editing{padding:10px 2px}
+  .mem-edit{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+  .mem-edit input{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;outline:none;min-width:0;flex:1 1 120px}
+  .mem-edit input.full{flex:1 1 100%}
+  .mem-edit input:focus{border-color:var(--brand-2)}
+  .mem-edit-btns{display:flex;gap:8px;flex:1 1 100%}
+  .mem-edit-btns button{flex:none;border-radius:10px;padding:8px 14px;font-weight:700}
+  .mem-edit-btns button[type=submit]{background:var(--brand);color:#fff}
+  .mem-edit-btns button.ghost{border:1px solid var(--line);color:var(--muted);background:var(--bg)}
 
   /* timeline */
   .timeline{position:relative;padding-left:18px}
@@ -513,6 +524,10 @@
 
   <section id="view-org-team75" class="view" hidden>
     <button type="button" class="back-btn" data-goto="org">← 返回组织</button>
+    <div class="card" id="team75BirthdayCard">
+      <div class="card-h"><h2>🎂 近期生日</h2><span class="hint">30 天内</span></div>
+      <ul id="list-team75Birthdays" class="rec-list"></ul>
+    </div>
     <div class="card">
       <div class="card-h"><h2>大事记</h2><span class="hint">时间线</span></div>
       <ul id="list-orgTeam75Events" class="rec-list timeline"></ul>
@@ -532,11 +547,13 @@
       </form>
     </div>
     <div class="card">
-      <div class="card-h"><h2>成员档案</h2><span class="hint">姓名＋角色</span></div>
+      <div class="card-h"><h2>成员档案</h2><span class="hint">姓名＋生日＋死党</span></div>
       <ul id="list-orgTeam75Members" class="rec-list"></ul>
       <form id="form-orgTeam75Members" class="add-form" autocomplete="off">
         <input name="name" placeholder="姓名" required>
         <input name="role" placeholder="角色">
+        <input type="date" name="birthday" aria-label="生日">
+        <input name="buddy" class="full" placeholder="死党（多个用、分隔）">
         <button type="submit">加</button>
       </form>
     </div>
@@ -631,6 +648,23 @@
     {group:'人员分工', text:'后期修片'}
   ];
 
+  /* 75团队内置名单：仅姓名＋死党（团队内公开），角色/生日留空由三藏自行补录 */
+  var DEFAULT_TEAM75 = [
+    {name:'杜尚峻', buddy:'黄笑君、刘忠诚'},
+    {name:'黄笑君', buddy:'刘忠诚、杜尚峻'},
+    {name:'刘忠诚', buddy:'黄笑君、杜尚峻'},
+    {name:'周承磊', buddy:'纪语伶'},
+    {name:'纪语伶', buddy:'周承磊'},
+    {name:'郭亚敏', buddy:'曾淏泽'},
+    {name:'曾淏泽', buddy:'郭亚敏'},
+    {name:'栾启瑞', buddy:'王琳'},
+    {name:'王琳', buddy:'栾启瑞'},
+    {name:'王禹梦', buddy:'顾雪'},
+    {name:'顾雪', buddy:'王禹梦'},
+    {name:'张超', buddy:'王晨晨'},
+    {name:'王晨晨', buddy:'张超'}
+  ];
+
   function blank(){
     return {
       version:2, notes:[], todos:[], briefs:{},
@@ -639,11 +673,26 @@
       org:{
         dream:{ events:[], members:[], meetings:[] },
         media:{ topics:[], calendar:[], reviews:[] },
-        team75:{ events:[], meetings:[], members:[] }
+        team75:{ events:[], meetings:[], members:[], seed:0 }
       }
     };
   }
   var state = blank();
+
+  /* 首次进入时把13人内置名单种入成员档案，避免重复，姓名＋死党（无生日） */
+  function seedTeam75(){
+    var t = state.org.team75;
+    if(t.seed >= 2) return;
+    var have = {};
+    t.members.forEach(function(m){ if(m && m.name) have[m.name] = true; });
+    var seeded = [];
+    DEFAULT_TEAM75.forEach(function(d){
+      if(have[d.name]) return;
+      seeded.push({ id:uid(), name:d.name, role:'', birthday:'', buddy:d.buddy, builtin:true });
+    });
+    t.members = seeded.concat(t.members);
+    t.seed = 2;
+  }
 
   function load(){
     var hadCareer = false;
@@ -676,11 +725,13 @@
         state.org.team75.events = arr(tt.events);
         state.org.team75.meetings = arr(tt.meetings);
         state.org.team75.members = arr(tt.members);
+        state.org.team75.seed = +tt.seed || 0;
       }
     }catch(e){ /* 本地数据损坏则忽略，不影响打开 */ }
     if(!state.career.sop.length && !hadCareer){
       state.career.sop = DEFAULT_SOP.map(function(s){ return {id:uid(), group:s.group, text:s.text, done:false}; });
     }
+    seedTeam75();
     state.version = 2;
   }
   function save(){
@@ -847,6 +898,75 @@
   }
   function dline(d){ return d ? '<div class="rec-date">'+esc(fmtDay(d))+'</div>' : ''; }
 
+  /* ---------- 75团队：成员编辑＋近期生日 ---------- */
+  var editingTeam75 = null;
+  function daysToBirthday(s){
+    var p=String(s||'').split('-'); if(p.length<3) return null;
+    var m=+p[1], d=+p[2]; if(!m || !d) return null;
+    var now=new Date(); now.setHours(0,0,0,0);
+    var next=new Date(now.getFullYear(), m-1, d);
+    if(next.getTime() < now.getTime()) next=new Date(now.getFullYear()+1, m-1, d);
+    return Math.round((next.getTime()-now.getTime())/86400000);
+  }
+  function fmtMonthDay(s){
+    var p=String(s||'').split('-'); if(p.length<3) return String(s||'');
+    return (+p[1])+'月'+(+p[2])+'日';
+  }
+  function team75MemberHTML(r){
+    if(r.id === editingTeam75){
+      return '<li class="rec editing" data-id="'+esc(r.id)+'">'
+        + '<form class="mem-edit" data-id="'+esc(r.id)+'">'
+        + '<input name="name" value="'+esc(r.name)+'" placeholder="姓名" required>'
+        + '<input name="role" value="'+esc(r.role||'')+'" placeholder="角色">'
+        + '<input type="date" name="birthday" value="'+esc(r.birthday||'')+'" aria-label="生日">'
+        + '<input name="buddy" class="full" value="'+esc(r.buddy||'')+'" placeholder="死党（多个用、分隔）">'
+        + '<div class="mem-edit-btns"><button type="submit">保存</button>'
+        + '<button type="button" class="ghost" data-act="cancelEdit">取消</button></div>'
+        + '</form></li>';
+    }
+    var sub = '';
+    if(r.role) sub += '<span class="rec-tag">'+esc(r.role)+'</span>';
+    if(r.birthday) sub += '<div class="rec-sub">生日：'+esc(fmtDay(r.birthday))+'</div>';
+    if(r.buddy) sub += '<div class="rec-sub">死党：'+esc(r.buddy)+'</div>';
+    return '<li class="rec" data-id="'+esc(r.id)+'">'
+      + '<div class="rec-main"><div class="rec-title">'+esc(r.name)+'</div>'+sub+'</div>'
+      + '<div class="rec-acts">'
+      + '<button type="button" class="edit" data-act="editMem" data-id="'+esc(r.id)+'">编辑</button>'
+      + delBtn('orgTeam75Members', r.id)
+      + '</div></li>';
+  }
+  function renderTeam75Birthdays(){
+    var ul = $('#list-team75Birthdays'); if(!ul) return;
+    var rows = [];
+    state.org.team75.members.forEach(function(m){
+      var dd = daysToBirthday(m.birthday);
+      if(dd !== null && dd <= 30) rows.push({ name:m.name, birthday:m.birthday, days:dd });
+    });
+    rows.sort(function(a,b){ return a.days - b.days; });
+    if(!rows.length){
+      ul.innerHTML = '<li class="empty">暂无（在成员档案补录生日后自动提醒）</li>';
+      ul.classList.add('is-empty');
+      return;
+    }
+    ul.classList.remove('is-empty');
+    ul.innerHTML = rows.map(function(r){
+      var when = r.days===0 ? '就是今天' : ('还有 '+r.days+' 天');
+      return '<li class="rec"><div class="rec-main"><div class="rec-title">'+esc(r.name)
+        + ' <span class="rec-tag">'+when+'</span></div>'
+        + '<div class="rec-sub">'+esc(fmtMonthDay(r.birthday))+'</div></div></li>';
+    }).join('');
+  }
+  function saveTeam75Member(form){
+    var rec = findRec('orgTeam75Members', form.dataset.id); if(!rec) return;
+    var v = readForm(form);
+    if(v.name) rec.name = v.name;
+    rec.role = v.role || '';
+    rec.birthday = v.birthday || '';
+    rec.buddy = v.buddy || '';
+    editingTeam75 = null;
+    save(); render(); toast('已保存');
+  }
+
   var RECS = {
     famTimeline:{
       get:function(){ return state.family.timeline; }, sort:byDateDesc, empty:'还没有家庭记录。',
@@ -942,8 +1062,8 @@
     },
     orgTeam75Members:{
       get:function(){ return state.org.team75.members; }, empty:'还没有成员档案。',
-      make:function(v){ return {id:uid(), name:(v.name||'').trim(), role:(v.role||'').trim()}; },
-      item:function(r){ return itemWrap('rec', '<div class="rec-title">'+esc(r.name)+'</div>'+(r.role?'<div class="rec-sub">'+esc(r.role)+'</div>':''), 'orgTeam75Members', r.id); }
+      make:function(v){ return {id:uid(), name:(v.name||'').trim(), role:(v.role||'').trim(), birthday:(v.birthday||'').trim(), buddy:(v.buddy||'').trim()}; },
+      item:function(r){ return team75MemberHTML(r); }
     }
   };
 
@@ -990,6 +1110,12 @@
   Object.keys(RECS).forEach(function(key){
     var form = $('#form-'+key); if(!form) return;
     form.addEventListener('submit', function(e){ e.preventDefault(); addRecFromForm(key, form); });
+  });
+  document.addEventListener('submit', function(e){
+    var f = e.target.closest ? e.target.closest('form.mem-edit') : null;
+    if(!f) return;
+    e.preventDefault();
+    saveTeam75Member(f);
   });
 
   /* ---------- image shrink (本机处理，不上传) ---------- */
@@ -1211,7 +1337,7 @@
 
   function render(){
     renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary(); loadReports(); renderOrgHub();
-    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar();
+    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar(); renderTeam75Birthdays();
   }
 
   /* 缪斯的总结：读取 summaries/YYYY-MM-DD.md，读不到就安静隐藏 */
@@ -1304,6 +1430,10 @@
     if(chip){ activeFilter = chip.dataset.tag; renderNotes(); return; }
     var dr = t.closest('[data-act="delRec"]');
     if(dr){ delRec(dr.dataset.key, dr.dataset.id); return; }
+    var em = t.closest('[data-act="editMem"]');
+    if(em){ editingTeam75 = em.dataset.id; render(); return; }
+    var ce = t.closest('[data-act="cancelEdit"]');
+    if(ce){ editingTeam75 = null; render(); return; }
     var sv = t.closest('[data-act="sop"]');
     if(sv){ var sl = sv.closest('li'); if(sl) toggleSop(sl.dataset.id); return; }
     var sd = t.closest('[data-act="sopDel"]');
