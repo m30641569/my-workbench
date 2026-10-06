@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="我的工作台">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; font-src 'none'; manifest-src blob:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; font-src 'none'; manifest-src blob:; base-uri 'none'; form-action 'none'">
 <title>我的工作台</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -96,6 +96,8 @@
 
   /* notes */
   .note-list{display:flex;flex-direction:column;gap:10px;margin-top:2px}
+  #museCard{border-left:4px solid #2f5d50;margin-top:12px}
+  .muse-summary{white-space:pre-wrap;line-height:1.75;font-size:15px}
   .note{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 13px;box-shadow:var(--shadow)}
   .note-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
   .note-time{font-size:12px;color:var(--muted)}
@@ -266,6 +268,10 @@
       <div id="tagFilters" class="chips"></div>
     </div>
     <ul id="allNotes" class="note-list"></ul>
+    <div class="card" id="museCard" hidden>
+      <div class="card-h"><h2>缪斯的总结</h2><span class="hint" id="museDate"></span></div>
+      <div id="museSummary" class="muse-summary"></div>
+    </div>
   </section>
 
   <section id="view-family" class="view" hidden>
@@ -1138,8 +1144,23 @@
   }
 
   function render(){
-    renderHeader(); renderBriefs(); renderToday(); renderNotes();
+    renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary();
     renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar();
+  }
+
+  /* 缪斯的总结：读取 summaries/YYYY-MM-DD.md，读不到就安静隐藏 */
+  var museLoadedDate = '';
+  function loadMuseSummary(){
+    var d = new Date(), ds = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+    if(museLoadedDate === ds) return; museLoadedDate = ds;
+    fetch('summaries/'+ds+'.md', {cache:'no-store'}).then(function(r){
+      if(!r.ok) throw 0; return r.text();
+    }).then(function(t){
+      t = (t||'').trim(); if(!t) throw 0;
+      $('#museDate').textContent = ds;
+      $('#museSummary').textContent = t;
+      $('#museCard').hidden = false;
+    }).catch(function(){ /* 没有总结就不显示 */ });
   }
 
   /* ---------- delegated events ---------- */
