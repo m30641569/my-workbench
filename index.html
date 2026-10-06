@@ -207,6 +207,27 @@
   .nav button .ico{font-size:19px;line-height:1}
   .nav button.active{color:var(--brand)}
 
+  /* org hub + back */
+  .hub-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 15px}
+  .hub-ico{flex:none;width:46px;height:46px;border-radius:13px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:23px;line-height:1}
+  .hub-main{flex:1;min-width:0}
+  .hub-title{display:block;font-size:16px;font-weight:800;letter-spacing:.04em}
+  .hub-desc{display:block;font-size:13px;color:var(--muted);margin-top:3px}
+  .hub-count{display:inline-block;font-size:12px;font-weight:700;color:var(--brand);background:var(--soft);border-radius:8px;padding:4px 9px;margin-top:7px}
+  .hub-arrow{flex:none;color:var(--muted);font-size:20px;line-height:1;padding-left:2px}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:14px;font-weight:700;color:var(--brand);background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 13px;box-shadow:var(--shadow)}
+
+  /* 早晚报 */
+  .report-h{font-size:14px;font-weight:800;color:var(--brand);margin:2px 0 8px}
+  .report-sec+.report-sec{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px}
+  .report-body{font-size:15px;line-height:1.75;word-break:break-word}
+  .report-body p{margin:0 0 8px}
+  .report-body p:last-child{margin-bottom:0}
+  .report-body ul{margin:0 0 8px}
+  .report-body li{position:relative;padding-left:15px;margin:3px 0}
+  .report-body li::before{content:"◆";position:absolute;left:0;top:1px;color:var(--brand-2);font-size:11px}
+  .report-body strong{font-weight:800}
+
   /* footer + toast */
   .foot{text-align:center;font-size:12px;color:var(--muted);line-height:1.7;padding:6px 8px 2px}
   .toast{
@@ -256,6 +277,18 @@
     <div class="card">
       <div class="card-h"><h2>最近记的</h2><button type="button" class="link" id="toNotes">全部 →</button></div>
       <ul id="recentNotes" class="note-list"></ul>
+    </div>
+
+    <div class="card" id="reportCard" hidden>
+      <div class="card-h"><h2>早晚报</h2><span class="hint" id="reportDate"></span></div>
+      <div class="report-sec" id="reportMorningWrap" hidden>
+        <h3 class="report-h">☀️ 今日早报</h3>
+        <div id="reportMorning" class="report-body"></div>
+      </div>
+      <div class="report-sec" id="reportEveningWrap" hidden>
+        <h3 class="report-h">🌙 今日晚报</h3>
+        <div id="reportEvening" class="report-body"></div>
+      </div>
     </div>
 
     <div class="foot">数据仅存本机浏览器 · 无任何外部网络请求 · 可离线使用</div>
@@ -387,7 +420,37 @@
   </section>
 
   <section id="view-org" class="view" hidden>
-    <div class="group-title">梦之队</div>
+    <button type="button" class="hub-card" data-goto="org-dream">
+      <span class="hub-ico">🌟</span>
+      <span class="hub-main">
+        <span class="hub-title">梦之队</span>
+        <span class="hub-desc">团队大事、成员与组会都在这里</span>
+        <span class="hub-count" id="hubCountDream"></span>
+      </span>
+      <span class="hub-arrow">›</span>
+    </button>
+    <button type="button" class="hub-card" data-goto="org-media">
+      <span class="hub-ico">📣</span>
+      <span class="hub-main">
+        <span class="hub-title">新媒体</span>
+        <span class="hub-desc">选题、内容日历与发布复盘</span>
+        <span class="hub-count" id="hubCountMedia"></span>
+      </span>
+      <span class="hub-arrow">›</span>
+    </button>
+    <button type="button" class="hub-card" data-goto="org-team75">
+      <span class="hub-ico">🤝</span>
+      <span class="hub-main">
+        <span class="hub-title">75团队</span>
+        <span class="hub-desc">75团队的大事、组会与成员</span>
+        <span class="hub-count" id="hubCountTeam75"></span>
+      </span>
+      <span class="hub-arrow">›</span>
+    </button>
+  </section>
+
+  <section id="view-org-dream" class="view" hidden>
+    <button type="button" class="back-btn" data-goto="org">← 返回组织</button>
     <div class="card">
       <div class="card-h"><h2>大事记</h2><span class="hint">时间线</span></div>
       <ul id="list-orgDreamEvents" class="rec-list timeline"></ul>
@@ -415,8 +478,10 @@
         <button type="submit">加</button>
       </form>
     </div>
+  </section>
 
-    <div class="group-title">新媒体</div>
+  <section id="view-org-media" class="view" hidden>
+    <button type="button" class="back-btn" data-goto="org">← 返回组织</button>
     <div class="card">
       <div class="card-h"><h2>选题库</h2><span class="hint">选题＋备注</span></div>
       <ul id="list-orgMediaTopics" class="rec-list"></ul>
@@ -445,8 +510,10 @@
         <button type="submit">加</button>
       </form>
     </div>
+  </section>
 
-    <div class="group-title">75 团队</div>
+  <section id="view-org-team75" class="view" hidden>
+    <button type="button" class="back-btn" data-goto="org">← 返回组织</button>
     <div class="card">
       <div class="card-h"><h2>大事记</h2><span class="hint">时间线</span></div>
       <ul id="list-orgTeam75Events" class="rec-list timeline"></ul>
@@ -1144,7 +1211,7 @@
   }
 
   function render(){
-    renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary();
+    renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary(); loadReports(); renderOrgHub();
     renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar();
   }
 
@@ -1163,9 +1230,54 @@
     }).catch(function(){ /* 没有总结就不显示 */ });
   }
 
+  /* 早晚报：读取 reports/YYYY-MM-DD-早报/晚报.md，读不到就安静隐藏 */
+  var reportsLoadedDate = '';
+  function mdInline(t){ return t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'); }
+  function mdLite(src){
+    var out = [], list = [];
+    function flush(){ if(list.length){ out.push('<ul>'+list.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul>'); list=[]; } }
+    esc(src).split(/\r?\n/).forEach(function(ln){
+      var t = ln.trim();
+      if(!t){ flush(); return; }
+      if(t.charAt(0)==='◆'){ list.push(mdInline(t.slice(1).trim())); return; }
+      flush(); out.push('<p>'+mdInline(t)+'</p>');
+    });
+    flush();
+    return out.join('');
+  }
+  function loadReports(){
+    var ds = todayKey();
+    if(reportsLoadedDate === ds) return; reportsLoadedDate = ds;
+    $('#reportDate').textContent = ds;
+    [['早报', 'reportMorning'], ['晚报', 'reportEvening']].forEach(function(pair){
+      var el = $('#'+pair[1]);
+      fetch('reports/'+ds+'-'+pair[0]+'.md', {cache:'no-store'}).then(function(r){
+        if(!r.ok) throw 0; return r.text();
+      }).then(function(t){
+        t = (t||'').trim(); if(!t) throw 0;
+        el.innerHTML = mdLite(t);
+        el.parentNode.hidden = false;
+        $('#reportCard').hidden = false;
+      }).catch(function(){ /* 没有就不显示 */ });
+    });
+  }
+
+  /* 组织枢纽：三张板块卡片的小计 */
+  function renderOrgHub(){
+    var o = state.org;
+    if($('#hubCountDream')) $('#hubCountDream').textContent =
+      '大事记 ×'+o.dream.events.length+' · 成员 ×'+o.dream.members.length+' · 组会 ×'+o.dream.meetings.length;
+    if($('#hubCountMedia')) $('#hubCountMedia').textContent =
+      '选题 ×'+o.media.topics.length+' · 日历 ×'+o.media.calendar.length+' · 复盘 ×'+o.media.reviews.length;
+    if($('#hubCountTeam75')) $('#hubCountTeam75').textContent =
+      '大事记 ×'+o.team75.events.length+' · 组会 ×'+o.team75.meetings.length+' · 成员 ×'+o.team75.members.length;
+  }
+
   /* ---------- delegated events ---------- */
   document.addEventListener('click', function(e){
     var t = e.target;
+    var go = t.closest('[data-goto]');
+    if(go){ switchView(go.dataset.goto); return; }
     var del = t.closest('[data-act="del"]');
     if(del){
       var li = del.closest('li'), id = li && li.dataset.id; if(!id) return;
@@ -1200,7 +1312,8 @@
   /* ---------- view switching ---------- */
   function switchView(name){
     $$('.view').forEach(function(v){ v.hidden = (v.id !== 'view-'+name); });
-    $$('.nav button').forEach(function(b){ b.classList.toggle('active', b.dataset.view===name); });
+    var navName = name.indexOf('org')===0 ? 'org' : name;
+    $$('.nav button').forEach(function(b){ b.classList.toggle('active', b.dataset.view===navName); });
     window.scrollTo(0,0);
   }
   $$('.nav button').forEach(function(b){ b.addEventListener('click', function(){ switchView(b.dataset.view); }); });
