@@ -218,8 +218,10 @@
   .back-btn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:14px;font-weight:700;color:var(--brand);background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 13px;box-shadow:var(--shadow)}
 
   /* 早晚报 */
-  .report-h{font-size:14px;font-weight:800;color:var(--brand);margin:2px 0 8px}
-  .report-sec+.report-sec{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px}
+  .report-tabs{display:flex;gap:8px;margin-bottom:12px}
+  .rtab{font-size:13px;font-weight:700;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 15px;line-height:1.4}
+  .rtab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .rtab[hidden]{display:none}
   .report-body{font-size:15px;line-height:1.75;word-break:break-word}
   .report-body p{margin:0 0 8px}
   .report-body p:last-child{margin-bottom:0}
@@ -281,14 +283,11 @@
 
     <div class="card" id="reportCard" hidden>
       <div class="card-h"><h2>早晚报</h2><span class="hint" id="reportDate"></span></div>
-      <div class="report-sec" id="reportMorningWrap" hidden>
-        <h3 class="report-h">☀️ 今日早报</h3>
-        <div id="reportMorning" class="report-body"></div>
+      <div class="report-tabs" id="reportTabs" role="tablist" aria-label="早晚报切换">
+        <button type="button" class="rtab" id="rtabMorning" data-report="morning" role="tab" aria-selected="true" hidden>☀️ 早报</button>
+        <button type="button" class="rtab" id="rtabEvening" data-report="evening" role="tab" aria-selected="false" hidden>🌙 晚报</button>
       </div>
-      <div class="report-sec" id="reportEveningWrap" hidden>
-        <h3 class="report-h">🌙 今日晚报</h3>
-        <div id="reportEvening" class="report-body"></div>
-      </div>
+      <div id="reportContent" class="report-body" role="tabpanel"></div>
     </div>
 
     <div class="foot">数据仅存本机浏览器 · 无任何外部网络请求 · 可离线使用</div>
@@ -1230,8 +1229,10 @@
     }).catch(function(){ /* 没有总结就不显示 */ });
   }
 
-  /* 早晚报：读取 reports/YYYY-MM-DD-早报/晚报.md，读不到就安静隐藏 */
+  /* 早晚报：读取 reports/YYYY-MM-DD-早报/晚报.md，点按钮切换；缺哪份隐哪份，都没有整块隐藏 */
   var reportsLoadedDate = '';
+  var reportsData = { morning:'', evening:'' };
+  var reportPicked = false;
   function mdInline(t){ return t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>'); }
   function mdLite(src){
     var out = [], list = [];
@@ -1245,19 +1246,28 @@
     flush();
     return out.join('');
   }
+  function setReportTab(which){
+    if(!reportsData[which]) return;
+    var isM = which==='morning';
+    $('#rtabMorning').classList.toggle('active', isM);
+    $('#rtabEvening').classList.toggle('active', !isM);
+    $('#rtabMorning').setAttribute('aria-selected', isM ? 'true' : 'false');
+    $('#rtabEvening').setAttribute('aria-selected', isM ? 'false' : 'true');
+    $('#reportContent').innerHTML = mdLite(reportsData[which]);
+  }
   function loadReports(){
     var ds = todayKey();
     if(reportsLoadedDate === ds) return; reportsLoadedDate = ds;
     $('#reportDate').textContent = ds;
-    [['早报', 'reportMorning'], ['晚报', 'reportEvening']].forEach(function(pair){
-      var el = $('#'+pair[1]);
+    [['早报', 'morning', 'rtabMorning'], ['晚报', 'evening', 'rtabEvening']].forEach(function(pair){
       fetch('reports/'+ds+'-'+pair[0]+'.md', {cache:'no-store'}).then(function(r){
         if(!r.ok) throw 0; return r.text();
       }).then(function(t){
         t = (t||'').trim(); if(!t) throw 0;
-        el.innerHTML = mdLite(t);
-        el.parentNode.hidden = false;
+        reportsData[pair[1]] = t;
+        $('#'+pair[2]).hidden = false;
         $('#reportCard').hidden = false;
+        if(!reportPicked && (pair[1]==='morning' || !reportsData.morning)) setReportTab(pair[1]);
       }).catch(function(){ /* 没有就不显示 */ });
     });
   }
@@ -1278,6 +1288,8 @@
     var t = e.target;
     var go = t.closest('[data-goto]');
     if(go){ switchView(go.dataset.goto); return; }
+    var rt = t.closest('[data-report]');
+    if(rt){ reportPicked = true; setReportTab(rt.dataset.report); return; }
     var del = t.closest('[data-act="del"]');
     if(del){
       var li = del.closest('li'), id = li && li.dataset.id; if(!id) return;
