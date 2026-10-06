@@ -141,10 +141,11 @@
   .mem-edit-btns button[type=submit]{background:var(--brand);color:#fff}
   .mem-edit-btns button.ghost{border:1px solid var(--line);color:var(--muted);background:var(--bg)}
 
-  /* 75团队：教练团＋学员档案两列 */
+  /* 75团队：教练团＋成员档案两列 */
   .coach-list{display:flex;flex-wrap:wrap;align-items:center;gap:6px 4px;min-height:24px}
   .coach-list .empty{padding:0}
   .coach-name{display:inline-flex;align-items:center;gap:2px;font-weight:600;font-size:14px;color:var(--brand);background:var(--soft);border-radius:999px;padding:4px 6px 4px 11px}
+  .coach-name .coach-role{font-weight:400;font-size:11px;color:var(--muted);margin-right:2px}
   .coach-name .del{font-size:15px;line-height:1;padding:0 3px;color:var(--brand);opacity:.55}
   .coach-sep{color:var(--muted)}
   .member-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -154,6 +155,8 @@
   .mem-card .mem-main{flex:1;min-width:0;word-break:break-word}
   .mem-card .mem-name{font-weight:700}
   .mem-card .mem-buddy{font-size:12px;color:var(--muted);margin-top:3px;white-space:pre-wrap}
+  .mem-card .mem-bday{font-size:12px;color:var(--muted);margin-top:2px}
+  .mem-card .mem-bday.hintline{font-size:11px;color:var(--brand-2);opacity:.85}
   .mem-card .del{opacity:.45}
   .member-grid .mem-card.editing{grid-column:1/-1;display:block;cursor:default;background:var(--card)}
   .member-grid .mem-card.editing:active{background:var(--card)}
@@ -547,23 +550,28 @@
       <div class="card-h"><h2>教练团</h2><span class="hint">点名字后的 × 删除</span></div>
       <div id="list-team75Coaches" class="coach-list"></div>
       <form id="form-team75Coaches" class="add-form" autocomplete="off">
-        <input name="name" class="full" placeholder="教练姓名…" required>
+        <input name="role" placeholder="职位，如：教练" style="max-width:7em">
+        <input name="name" class="full" placeholder="姓名…" required>
         <button type="submit">加</button>
       </form>
     </div>
     <div class="card">
-      <div class="card-h"><h2>学员档案</h2><span class="hint">点格子编辑</span></div>
+      <div class="card-h"><h2>成员档案</h2><span class="hint">姓名＋生日＋死党</span></div>
       <ul id="list-orgTeam75Members" class="rec-list member-grid"></ul>
       <form id="form-orgTeam75Members" class="add-form" autocomplete="off">
         <input name="name" placeholder="姓名" required>
-        <input name="role" placeholder="角色">
-        <input type="date" name="birthday" aria-label="生日">
+        <input type="date" name="birthday" aria-label="公历生日">
+        <input name="lunar" placeholder="农历生日，如：正月初一">
         <input name="buddy" class="full" placeholder="死党（多个用、分隔）">
         <button type="submit">加</button>
       </form>
     </div>
+    <div class="card" id="team75BuddyPairCard">
+      <div class="card-h"><h2>死党配对</h2><span class="hint">6 组</span></div>
+      <ul id="list-team75BuddyPairs" class="rec-list"></ul>
+    </div>
     <div class="card" id="team75BirthdayCard">
-      <div class="card-h"><h2>🎂 近期生日</h2><span class="hint">30 天内</span></div>
+      <div class="card-h"><h2>🎂 生日提醒</h2><span class="hint">未来 7 天</span></div>
       <ul id="list-team75Birthdays" class="rec-list"></ul>
     </div>
     <div class="card">
@@ -675,6 +683,14 @@
     {group:'人员分工', text:'后期修片'}
   ];
 
+  /* 75团队教练团内置名单（团队内公开）：团长＋教练 */
+  var DEFAULT_COACHES = [
+    {name:'薛宏生', role:'团长'},
+    {name:'胡晚宇', role:'教练'},
+    {name:'鞠宗谨', role:'教练'},
+    {name:'常丹', role:'教练'}
+  ];
+
   /* 75团队内置名单：仅姓名＋死党（团队内公开），角色/生日留空由三藏自行补录 */
   var DEFAULT_TEAM75 = [
     {name:'杜尚峻', buddy:'黄笑君、刘忠诚'},
@@ -690,6 +706,16 @@
     {name:'顾雪', buddy:'王禹梦'},
     {name:'张超', buddy:'王晨晨'},
     {name:'王晨晨', buddy:'张超'}
+  ];
+
+  /* 死党配对（团队内公开）：6 组关系 */
+  var TEAM75_BUDDY_PAIRS = [
+    { members:['刘忠诚','黄笑君','杜尚峻'], note:'三人互为死党' },
+    { members:['周承磊','纪语伶'] },
+    { members:['郭亚敏','曾淏泽'] },
+    { members:['栾启瑞','王琳'] },
+    { members:['王禹梦','顾雪'] },
+    { members:['张超','王晨晨'] }
   ];
 
   function blank(){
@@ -709,16 +735,26 @@
   /* 首次进入时把13人内置名单种入成员档案，避免重复，姓名＋死党（无生日） */
   function seedTeam75(){
     var t = state.org.team75;
-    if(t.seed >= 2) return;
-    var have = {};
-    t.members.forEach(function(m){ if(m && m.name) have[m.name] = true; });
-    var seeded = [];
-    DEFAULT_TEAM75.forEach(function(d){
-      if(have[d.name]) return;
-      seeded.push({ id:uid(), name:d.name, role:'', birthday:'', buddy:d.buddy, builtin:true });
+    if(t.seed >= 3) return;
+    if(t.seed < 2){
+      var have = {};
+      t.members.forEach(function(m){ if(m && m.name) have[m.name] = true; });
+      var seeded = [];
+      DEFAULT_TEAM75.forEach(function(d){
+        if(have[d.name]) return;
+        seeded.push({ id:uid(), name:d.name, role:'', birthday:'', lunar:'', buddy:d.buddy, builtin:true });
+      });
+      t.members = seeded.concat(t.members);
+      t.seed = 2;
+    }
+    /* 教练团名单：团长＋教练，刷新即见，App 内仍可增删 */
+    var haveC = {};
+    t.coaches.forEach(function(c){ if(c && c.name) haveC[c.name] = true; });
+    DEFAULT_COACHES.forEach(function(d){
+      if(haveC[d.name]) return;
+      t.coaches.push({ id:uid(), name:d.name, role:d.role, builtin:true });
     });
-    t.members = seeded.concat(t.members);
-    t.seed = 2;
+    t.seed = 3;
   }
 
   function load(){
@@ -949,8 +985,8 @@
       return '<li class="mem-card editing" data-id="'+esc(r.id)+'">'
         + '<form class="mem-edit" data-id="'+esc(r.id)+'">'
         + '<input name="name" value="'+esc(r.name)+'" placeholder="姓名" required>'
-        + '<input name="role" value="'+esc(r.role||'')+'" placeholder="角色">'
-        + '<input type="date" name="birthday" value="'+esc(r.birthday||'')+'" aria-label="生日">'
+        + '<input type="date" name="birthday" value="'+esc(r.birthday||'')+'" aria-label="公历生日">'
+        + '<input name="lunar" value="'+esc(r.lunar||'')+'" placeholder="农历生日，如：正月初一">'
         + '<input name="buddy" class="full" value="'+esc(r.buddy||'')+'" placeholder="死党（多个用、分隔）">'
         + '<div class="mem-edit-btns"><button type="submit">保存</button>'
         + '<button type="button" class="ghost" data-act="cancelEdit">取消</button></div>'
@@ -958,9 +994,28 @@
     }
     return '<li class="mem-card" data-act="editMem" data-id="'+esc(r.id)+'" role="button" tabindex="0">'
       + '<div class="mem-main"><div class="mem-name">'+esc(r.name)+'</div>'
+      + memberBirthdayHTML(r)
       + '<div class="mem-buddy">死党：'+esc(r.buddy||'—')+'</div></div>'
       + delBtn('orgTeam75Members', r.id)
       + '</li>';
+  }
+  /* 生日显示：本机已填则显示公历＋农历，未填则提示补录（生日不入代码） */
+  function memberBirthdayHTML(r){
+    if(r.birthday || r.lunar){
+      var g = r.birthday ? esc(String(r.birthday).replace(/-/g,'.')) : '';
+      var l = r.lunar ? esc(r.lunar) : '';
+      if(g && l) return '<div class="mem-bday">'+g+'（'+l+'）</div>';
+      return '<div class="mem-bday">'+(g||l)+'</div>';
+    }
+    return '<div class="mem-bday hintline">生日未填，点编辑补上</div>';
+  }
+  /* 死党配对卡：6 组关系（仅姓名，团队内公开） */
+  function renderTeam75BuddyPairs(){
+    var ul = $('#list-team75BuddyPairs'); if(!ul) return;
+    ul.innerHTML = TEAM75_BUDDY_PAIRS.map(function(p){
+      return '<li class="rec"><div class="rec-main"><div class="rec-title">'+esc(p.members.join(' ↔ '))+'</div>'
+        + (p.note ? '<div class="rec-sub">'+esc(p.note)+'</div>' : '')+'</div></li>';
+    }).join('');
   }
   /* 教练团：横向人名列表，本地存储，支持增删 */
   function renderTeam75Coaches(){
@@ -968,7 +1023,7 @@
     var list = state.org.team75.coaches || [];
     if(!list.length){ wrap.innerHTML = '<span class="empty">还没有教练，在下方添加。</span>'; return; }
     wrap.innerHTML = list.map(function(c){
-      return '<span class="coach-name">'+esc(c.name)
+      return '<span class="coach-name">'+(c.role?'<span class="coach-role">'+esc(c.role)+'</span>':'')+esc(c.name)
         + '<button type="button" class="del" data-act="delCoach" data-id="'+esc(c.id)+'" aria-label="删除">×</button></span>';
     }).join('<span class="coach-sep">·</span>');
   }
@@ -982,11 +1037,11 @@
     var rows = [];
     state.org.team75.members.forEach(function(m){
       var dd = daysToBirthday(m.birthday);
-      if(dd !== null && dd <= 30) rows.push({ name:m.name, birthday:m.birthday, days:dd });
+      if(dd !== null && dd <= 7) rows.push({ name:m.name, birthday:m.birthday, days:dd });
     });
     rows.sort(function(a,b){ return a.days - b.days; });
     if(!rows.length){
-      ul.innerHTML = '<li class="empty">暂无（在成员档案补录生日后自动提醒）</li>';
+      ul.innerHTML = '<li class="empty">暂无（在成员档案点编辑补录生日后自动提醒）</li>';
       ul.classList.add('is-empty');
       return;
     }
@@ -1004,6 +1059,7 @@
     if(v.name) rec.name = v.name;
     rec.role = v.role || '';
     rec.birthday = v.birthday || '';
+    rec.lunar = v.lunar || '';
     rec.buddy = v.buddy || '';
     editingTeam75 = null;
     save(); render(); toast('已保存');
@@ -1103,8 +1159,8 @@
       item:function(r){ return itemWrap('rec', dline(r.date)+'<div class="rec-title">'+esc(r.text)+'</div>', 'orgTeam75Meetings', r.id); }
     },
     orgTeam75Members:{
-      get:function(){ return state.org.team75.members; }, empty:'还没有学员档案。',
-      make:function(v){ return {id:uid(), name:(v.name||'').trim(), role:(v.role||'').trim(), birthday:(v.birthday||'').trim(), buddy:(v.buddy||'').trim()}; },
+      get:function(){ return state.org.team75.members; }, empty:'还没有成员档案。',
+      make:function(v){ return {id:uid(), name:(v.name||'').trim(), role:(v.role||'').trim(), birthday:(v.birthday||'').trim(), lunar:(v.lunar||'').trim(), buddy:(v.buddy||'').trim()}; },
       item:function(r){ return team75MemberHTML(r); }
     }
   };
@@ -1158,11 +1214,13 @@
     coachForm.addEventListener('submit', function(e){
       e.preventDefault();
       var inp = coachForm.querySelector('input[name="name"]');
+      var roleInp = coachForm.querySelector('input[name="role"]');
       var name = ((inp && inp.value) || '').trim();
       if(!name) return;
+      var role = ((roleInp && roleInp.value) || '').trim();
       if(!state.org.team75.coaches) state.org.team75.coaches = [];
-      state.org.team75.coaches.push({ id:uid(), name:name });
-      save(); inp.value=''; renderTeam75Coaches(); toast('已添加');
+      state.org.team75.coaches.push({ id:uid(), name:name, role:role });
+      save(); coachForm.reset(); renderTeam75Coaches(); toast('已添加');
     });
   }
   document.addEventListener('submit', function(e){
@@ -1452,7 +1510,7 @@
 
   function render(){
     renderHeader(); renderBriefs(); renderToday(); renderNotes(); loadMuseSummary(); loadReports(); renderOrgHub();
-    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar(); renderTeam75Coaches(); renderTeam75Birthdays();
+    renderRecs(); renderSOP(); renderGrowthChart(); renderCalendar(); renderTeam75Coaches(); renderTeam75BuddyPairs(); renderTeam75Birthdays();
   }
 
   /* 缪斯的总结：读取 summaries/YYYY-MM-DD.md，读不到就安静隐藏 */
